@@ -1,34 +1,27 @@
-# المرحلة الأولى: البناء
-FROM eclipse-temurin:21-jdk-jammy AS build
+# ----------------------
+# مرحلة البناء
+# ----------------------
+FROM maven:3.9.3-eclipse-temurin-21 AS build
 
+# إعداد مجلد العمل
 WORKDIR /app
 
 # نسخ ملفات المشروع
-COPY pom.xml mvnw ./
-COPY .mvn .mvn
-COPY src src
+COPY pom.xml .
+COPY src ./src
 
-# تنزيل الـ dependencies وبناء الـ JAR
-RUN ./mvnw clean package -DskipTests
+# بناء المشروع (سيتم توليد target وملفات .mvn داخليًا)
+RUN mvn clean package -DskipTests
 
-# المرحلة الثانية: تشغيل التطبيق
+# ----------------------
+# مرحلة التشغيل
+# ----------------------
 FROM eclipse-temurin:21-jdk-jammy
 
 WORKDIR /app
 
-# نسخ الـ JAR النهائي من مرحلة البناء
-COPY --from=build /app/target/demo-0.0.1-SNAPSHOT.jar app.jar
+# نسخ ملف الـ jar الناتج من مرحلة البناء
+COPY --from=build /app/target/*.jar app.jar
 
-# تعيين المتغيرات البيئية (يمكن تعديلها على Render)
-ENV SPRING_PROFILES_ACTIVE=prod
-ENV TELEGRAM_TOKEN=""
-ENV RENDER_EXTERNAL_URL=""
-ENV SUPABASE_URL=""
-ENV SUPABASE_KEY=""
-ENV SUPABASE_BUCKET=food-stor
-
-# فتح البورت
-EXPOSE 8080
-
-# تشغيل التطبيق
+# تحديد الأمر لتشغيل التطبيق
 ENTRYPOINT ["java", "-jar", "app.jar"]
