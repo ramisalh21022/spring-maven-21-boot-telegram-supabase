@@ -1,7 +1,7 @@
 # ----------------------
 # مرحلة البناء
 # ----------------------
-FROM maven:3.9.3-eclipse-temurin-21 AS build
+FROM maven:3.9.3-jdk-21
 
 WORKDIR /app
 
@@ -23,4 +23,5 @@ WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
 
 ENTRYPOINT ["java", "-jar", "app.jar"]
+
 
