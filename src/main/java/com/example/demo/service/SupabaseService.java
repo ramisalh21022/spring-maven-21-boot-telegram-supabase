@@ -234,21 +234,32 @@ public boolean addOrderItem(Integer orderId, Integer productId, Integer quantity
 
 
     // تأكيد الطلب
-    public void confirmOrder(Integer orderId) {
-        Map<String,Object> body = new HashMap<>();
-        body.put("status", "confirmed");
+   // تأكيد الطلب وإرجاع معلوماته
+public Map<String, Object> confirmOrderAndGet(Integer orderId) {
+    Map<String,Object> body = new HashMap<>();
+    body.put("status", "confirmed");
 
-        webClient.patch()
-                .uri(appConfig.getSupabaseUrl() + "/rest/v1/orders?id=eq." + orderId)
-                .header("apikey", appConfig.getSupabaseKey())
-                .header("Authorization", "Bearer " + appConfig.getSupabaseKey())
-                .header("Content-Type", "application/json")
-                .bodyValue(body)
-                .retrieve()
-                .bodyToMono(Void.class)
-                .block();
+    // تحديث الطلب
+    List<Map<String,Object>> updated = webClient.patch()
+            .uri(appConfig.getSupabaseUrl() + "/rest/v1/orders?id=eq." + orderId)
+            .header("apikey", appConfig.getSupabaseKey())
+            .header("Authorization", "Bearer " + appConfig.getSupabaseKey())
+            .header("Content-Type", "application/json")
+            .header("Prefer", "return=representation")
+            .bodyValue(body)
+            .retrieve()
+            .bodyToMono(List.class)
+            .block();
+
+    if (updated == null || updated.isEmpty()) {
+        throw new RuntimeException("لم يتم العثور على الطلب " + orderId);
     }
+
+    return updated.get(0);
 }
+
+}
+
 
 
 
