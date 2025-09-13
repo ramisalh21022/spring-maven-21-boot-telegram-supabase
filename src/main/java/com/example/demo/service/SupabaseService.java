@@ -4,6 +4,7 @@ import com.example.demo.config.AppConfig;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.core.ParameterizedTypeReference;
 
 import java.util.HashMap;
 import java.util.List;
@@ -202,23 +203,29 @@ public boolean addOrderItem(Integer orderId, Integer productId, Integer quantity
 
     // تحديث رقم الهاتف للعميل
     public void updateClientPhone(Integer clientId, String phone) {
-    // تحقق إذا الرقم موجود مسبقًا
-    List<Map<String,Object>> existing = webClient.get()
-        .uri(appConfig.getSupabaseUrl() + "/rest/v1/clients?phone=eq." + phone)
-        .header("apikey", appConfig.getSupabaseKey())
-        .header("Authorization", "Bearer " + appConfig.getSupabaseKey())
-        .retrieve()
-        .bodyToMono(List.class)
-        .block();
+    // تحقق أولاً هل الرقم موجود عند عميل آخر
+    List<Map<String, Object>> existing = webClient.get()
+            .uri(appConfig.getSupabaseUrl() + "/rest/v1/clients?phone=eq." + phone)
+            .header("apikey", appConfig.getSupabaseKey())
+            .header("Authorization", "Bearer " + appConfig.getSupabaseKey())
+            .retrieve()
+            .bodyToFlux(new ParameterizedTypeReference<Map<String, Object>>() {})
+            .collectList()
+            .block();
 
     if (existing != null && !existing.isEmpty()) {
-        // إذا الرقم موجود ولكن ليس للعميل نفسه
-        if (!existing.get(0).get("id").equals(clientId)) {
-            throw new RuntimeException("رقم الهاتف موجود مسبقًا لعميل آخر!");
+        Map<String, Object> match = existing.get(0);
+        Integer existingId = (Integer) match.get("id");
+        if (!existingId.equals(clientId)) {
+            throw new RuntimeException("رقم الهاتف مستخدم من عميل آخر");
+        } else {
+            // نفس العميل → لا حاجة لتحديث الرقم
+            return;
         }
     }
 
-    Map<String,Object> body = new HashMap<>();
+    // التحديث إذا الرقم غير مستخدم
+    Map<String, Object> body = new HashMap<>();
     body.put("phone", phone);
 
     webClient.patch()
@@ -231,7 +238,6 @@ public boolean addOrderItem(Integer orderId, Integer productId, Integer quantity
             .bodyToMono(Void.class)
             .block();
 }
-
 
     // تأكيد الطلب
    // تأكيد الطلب وإرجاع معلوماته
@@ -261,6 +267,7 @@ public Map<String, Object> confirmOrderAndGet(Integer orderId) {
 
 
 }
+
 
 
 
