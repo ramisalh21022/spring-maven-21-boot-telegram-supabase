@@ -189,74 +189,69 @@ public class TelegramService extends TelegramWebhookBot {
 
     }
 
-   private void handleContact(Long chatId, Contact contact) throws TelegramApiException {
-        Integer orderId = pendingOrders.get(chatId);
-        Map<String, Object> client = clientsDataCache.get(chatId);
-        if (orderId == null || client == null) return;
+  private void handleContact(Long chatId, Contact contact) throws TelegramApiException {
+    Integer orderId = pendingOrders.get(chatId);
+    Map<String, Object> client = clientsDataCache.get(chatId);
+    if (orderId == null || client == null) return;
 
-        // تحديث الرقم باستخدام الدالة الجديدة
-        Integer finalClientId = supabaseService.updateClientPhone(
-                (Integer) client.get("id"),
-                contact.getPhoneNumber(),
-                (String) client.get("owner_name")
-        );
+    // محاولة تحديث رقم الهاتف بشكل آمن
+    Integer finalClientId = supabaseService.updateClientPhone((Integer) client.get("id"), contact.getPhoneNumber());
 
-        if (finalClientId == null) {
-            execute(SendMessage.builder()
-                    .chatId(chatId.toString())
-                    .text("⚠️ حدث خطأ أثناء تحديث رقم الهاتف، يرجى المحاولة لاحقاً.")
-                    .build());
-            return;
-        }
-
-        // تحديث الكاش بالـ clientId النهائي
-        clientsCache.put(chatId, finalClientId);
-
-        // تأكيد الطلب
-        supabaseService.confirmOrderAndGet(orderId);
-
-        // بطاقة ترحيب
-        String distributorPhone = "963940452940"; // رقم المتجر الثابت
-        String message = "🎉 شكراً لتأكيد طلبك!\n\n" +
-                "🆔 رقم الطلب: " + orderId + "\n" +
-                "👤 الاسم: " + client.get("owner_name") + "\n" +
-                "📱 هاتفك: " + contact.getPhoneNumber() + "\n" +
-                "☎️ هاتف المتجر: " + distributorPhone + "\n\n" +
-                "✅ اختر طريقة إرسال طلبك للمتجر:";
-
-        InlineKeyboardButton tgButton = InlineKeyboardButton.builder()
-                .text("📢 عبر Telegram")
-                .callbackData("SEND_TG:" + orderId)
-                .build();
-
-        InlineKeyboardButton waButton = InlineKeyboardButton.builder()
-                .text("💬 عبر WhatsApp")
-                .callbackData("SEND_WA:" + orderId)
-                .build();
-
-        InlineKeyboardButton smsButton = InlineKeyboardButton.builder()
-                .text("📩 عبر SMS")
-                .callbackData("SEND_SMS:" + orderId)
-                .build();
-
-        InlineKeyboardMarkup markup = InlineKeyboardMarkup.builder()
-                .keyboard(List.of(
-                        List.of(tgButton),
-                        List.of(waButton),
-                        List.of(smsButton)
-                ))
-                .build();
-
+    if (finalClientId == null) {
         execute(SendMessage.builder()
                 .chatId(chatId.toString())
-                .text(message)
-                .replyMarkup(markup)
+                .text("⚠️ حدث خطأ أثناء تحديث رقم الهاتف، يرجى المحاولة لاحقاً.")
                 .build());
-
-        // تنظيف الطلبات المعلقة
-        pendingOrders.remove(chatId);
+        return;
     }
+
+    // تأكيد الطلب بعد التحقق من العميل
+    supabaseService.confirmOrderAndGet(orderId);
+
+    // بطاقة ترحيب
+    String distributorPhone = "963940452940"; // رقم المتجر الثابت
+    String message = "🎉 شكراً لتأكيد طلبك!\n\n" +
+            "🆔 رقم الطلب: " + orderId + "\n" +
+            "👤 الاسم: " + client.get("owner_name") + "\n" +
+            "📱 هاتفك: " + contact.getPhoneNumber() + "\n" +
+            "☎️ هاتف المتجر: " + distributorPhone + "\n\n" +
+            "✅ اختر طريقة إرسال طلبك للمتجر:";
+
+    InlineKeyboardButton tgButton = InlineKeyboardButton.builder()
+            .text("📢 عبر Telegram")
+            .callbackData("SEND_TG:" + orderId)
+            .build();
+
+    InlineKeyboardButton waButton = InlineKeyboardButton.builder()
+            .text("💬 عبر WhatsApp")
+            .callbackData("SEND_WA:" + orderId)
+            .build();
+
+    InlineKeyboardButton smsButton = InlineKeyboardButton.builder()
+            .text("📩 عبر SMS")
+            .callbackData("SEND_SMS:" + orderId)
+            .build();
+
+    InlineKeyboardMarkup markup = InlineKeyboardMarkup.builder()
+            .keyboard(List.of(
+                    List.of(tgButton),
+                    List.of(waButton),
+                    List.of(smsButton)
+            ))
+            .build();
+
+    execute(SendMessage.builder()
+            .chatId(chatId.toString())
+            .text(message)
+            .replyMarkup(markup)
+            .build());
+
+    // تنظيف الطلبات المعلقة
+    pendingOrders.remove(chatId);
 }
+
+}
+
 
 
 
