@@ -112,91 +112,126 @@ public class SupabaseService {
     }
 
     // إضافة عنصر للطلب
-public void addOrderItem(Integer orderId, Integer productId, Integer quantity) {
-    // جلب المنتج أولاً
-    List<Map<String, Object>> prodList = webClient.get()
-            .uri(appConfig.getSupabaseUrl() + "/rest/v1/products_comp?id=eq." + productId)
-            .header("apikey", appConfig.getSupabaseKey())
-            .header("Authorization", "Bearer " + appConfig.getSupabaseKey())
-            .retrieve()
-            .bodyToMono(List.class)
-            .block();
+public boolean addOrderItem(Integer orderId, Integer productId, Integer quantity) {
+    try {
+        // جلب المنتج أولاً
+        List<Map<String, Object>> prodList = webClient.get()
+                .uri(appConfig.getSupabaseUrl() + "/rest/v1/products_comp?id=eq." + productId)
+                .header("apikey", appConfig.getSupabaseKey())
+                .header("Authorization", "Bearer " + appConfig.getSupabaseKey())
+                .retrieve()
+                .bodyToMono(List.class)
+                .block();
 
-    if (prodList == null || prodList.isEmpty()) {
-        throw new RuntimeException("المنتج غير موجود");
+        if (prodList == null || prodList.isEmpty()) {
+            System.out.println("المنتج غير موجود: " + productId);
+            return false;
+        }
+
+        Map<String, Object> prod = prodList.get(0);
+        Number priceNum = (Number) prod.get("price"); // التعامل مع أي نوع رقمي
+        int price = priceNum != null ? priceNum.intValue() : 0;
+
+        // إنشاء عنصر الطلب
+        Map<String, Object> item = new HashMap<>();
+        item.put("order_id", orderId);
+        item.put("product_id", productId);
+        item.put("quantity", quantity);
+        item.put("unit_price", price);
+
+        // إرسال الطلب إلى Supabase
+        List<Map<String,Object>> response = webClient.post()
+                .uri(appConfig.getSupabaseUrl() + "/rest/v1/order_items")
+                .header("apikey", appConfig.getSupabaseKey())
+                .header("Authorization", "Bearer " + appConfig.getSupabaseKey())
+                .header("Content-Type", "application/json")
+                .header("Prefer", "return=representation")
+                .bodyValue(item)
+                .retrieve()
+                .bodyToMono(List.class)
+                .block();
+
+        if (response == null || response.isEmpty()) {
+            System.out.println("فشل إضافة عنصر للطلب: " + productId);
+            return false;
+        }
+
+        // تحديث إجمالي الطلب
+        List<Map<String,Object>> totalItems = webClient.get()
+                .uri(appConfig.getSupabaseUrl() + "/rest/v1/order_items?order_id=eq." + orderId)
+                .header("apikey", appConfig.getSupabaseKey())
+                .header("Authorization", "Bearer " + appConfig.getSupabaseKey())
+                .retrieve()
+                .bodyToMono(List.class)
+                .block();
+
+        int totalPrice = 0;
+        if (totalItems != null) {
+            totalPrice = totalItems.stream()
+                    .mapToInt(i -> {
+                        Number q = (Number) i.get("quantity");
+                        Number p = (Number) i.get("unit_price");
+                        return q.intValue() * p.intValue();
+                    })
+                    .sum();
+        }
+
+        Map<String, Object> totalUpdate = new HashMap<>();
+        totalUpdate.put("total_price", totalPrice);
+
+        webClient.patch()
+                .uri(appConfig.getSupabaseUrl() + "/rest/v1/orders?id=eq." + orderId)
+                .header("apikey", appConfig.getSupabaseKey())
+                .header("Authorization", "Bearer " + appConfig.getSupabaseKey())
+                .header("Content-Type", "application/json")
+                .bodyValue(totalUpdate)
+                .retrieve()
+                .bodyToMono(Void.class)
+                .block();
+
+        return true; // تم الإضافة بنجاح
+
+    } catch (Exception e) {
+        e.printStackTrace();
+        return false;
     }
-
-    Map<String, Object> prod = prodList.get(0);
-    Number priceNumber = (Number) prod.get("price");  // تحويل آمن
-    Integer price = priceNumber.intValue();
-
-    // إنشاء عنصر الطلب
-    Map<String, Object> item = new HashMap<>();
-    item.put("order_id", orderId);
-    item.put("product_id", productId);
-    item.put("quantity", quantity);
-    item.put("unit_price", price);
-
-    // إرسال الطلب إلى Supabase
-    List<Map<String,Object>> response = webClient.post()
-            .uri(appConfig.getSupabaseUrl() + "/rest/v1/order_items")
-            .header("apikey", appConfig.getSupabaseKey())
-            .header("Authorization", "Bearer " + appConfig.getSupabaseKey())
-            .header("Content-Type", "application/json")
-            .header("Prefer", "return=representation")
-            .bodyValue(item)
-            .retrieve()
-            .bodyToMono(List.class)
-            .block();
-
-    // تحديث إجمالي الطلب
-    List<Map<String,Object>> totalItems = webClient.get()
-            .uri(appConfig.getSupabaseUrl() + "/rest/v1/order_items?order_id=eq." + orderId)
-            .header("apikey", appConfig.getSupabaseKey())
-            .header("Authorization", "Bearer " + appConfig.getSupabaseKey())
-            .retrieve()
-            .bodyToMono(List.class)
-            .block();
-
-    Integer totalPrice = totalItems.stream()
-            .mapToInt(i -> {
-                Number q = (Number) i.get("quantity");
-                Number u = (Number) i.get("unit_price");
-                return q.intValue() * u.intValue();
-            })
-            .sum();
-
-    Map<String, Object> totalUpdate = new HashMap<>();
-    totalUpdate.put("total_price", totalPrice);
-
-    webClient.patch()
-            .uri(appConfig.getSupabaseUrl() + "/rest/v1/orders?id=eq." + orderId)
-            .header("apikey", appConfig.getSupabaseKey())
-            .header("Authorization", "Bearer " + appConfig.getSupabaseKey())
-            .header("Content-Type", "application/json")
-            .bodyValue(totalUpdate)
-            .retrieve()
-            .bodyToMono(Void.class)
-            .block();
 }
+
 
 
 
     // تحديث رقم الهاتف للعميل
     public void updateClientPhone(Integer clientId, String phone) {
-        Map<String,Object> body = new HashMap<>();
-        body.put("phone", phone);
+    // تحقق إذا الرقم موجود مسبقًا
+    List<Map<String,Object>> existing = webClient.get()
+        .uri(appConfig.getSupabaseUrl() + "/rest/v1/clients?phone=eq." + phone)
+        .header("apikey", appConfig.getSupabaseKey())
+        .header("Authorization", "Bearer " + appConfig.getSupabaseKey())
+        .retrieve()
+        .bodyToMono(List.class)
+        .block();
 
-        webClient.patch()
-                .uri(appConfig.getSupabaseUrl() + "/rest/v1/clients?id=eq." + clientId)
-                .header("apikey", appConfig.getSupabaseKey())
-                .header("Authorization", "Bearer " + appConfig.getSupabaseKey())
-                .header("Content-Type", "application/json")
-                .bodyValue(body)
-                .retrieve()
-                .bodyToMono(Void.class)
-                .block();
+    if (existing != null && !existing.isEmpty()) {
+        // إذا الرقم موجود ولكن ليس للعميل نفسه
+        if (!existing.get(0).get("id").equals(clientId)) {
+            throw new RuntimeException("رقم الهاتف موجود مسبقًا لعميل آخر!");
+        }
     }
+
+    Map<String,Object> body = new HashMap<>();
+    body.put("phone", phone);
+
+    webClient.patch()
+            .uri(appConfig.getSupabaseUrl() + "/rest/v1/clients?id=eq." + clientId)
+            .header("apikey", appConfig.getSupabaseKey())
+            .header("Authorization", "Bearer " + appConfig.getSupabaseKey())
+            .header("Content-Type", "application/json")
+            .bodyValue(body)
+            .retrieve()
+            .bodyToMono(Void.class)
+            .block();
+}
+
 
     // تأكيد الطلب
     public void confirmOrder(Integer orderId) {
@@ -214,5 +249,6 @@ public void addOrderItem(Integer orderId, Integer productId, Integer quantity) {
                 .block();
     }
 }
+
 
 
