@@ -235,6 +235,7 @@ public boolean addOrderItem(Integer orderId, Integer productId, Integer quantity
 
     // تأكيد الطلب
    // تأكيد الطلب وإرجاع معلوماته
+// تأكيد الطلب وإرجاع معلوماته
 public Map<String, Object> confirmOrderAndGet(Integer orderId) {
     Map<String,Object> body = new HashMap<>();
     body.put("status", "confirmed");
@@ -258,7 +259,9 @@ public Map<String, Object> confirmOrderAndGet(Integer orderId) {
     return updated.get(0);
 }
 
+
 }
+
 
 
 
