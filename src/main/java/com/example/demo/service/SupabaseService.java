@@ -119,7 +119,7 @@ public void addOrderItem(Integer orderId, Integer productId, Integer quantity) {
             .header("apikey", appConfig.getSupabaseKey())
             .header("Authorization", "Bearer " + appConfig.getSupabaseKey())
             .retrieve()
-            .bodyToMono(List.class)  // ✅ استبدل Map.class بـ List.class
+            .bodyToMono(List.class)
             .block();
 
     if (prodList == null || prodList.isEmpty()) {
@@ -127,7 +127,8 @@ public void addOrderItem(Integer orderId, Integer productId, Integer quantity) {
     }
 
     Map<String, Object> prod = prodList.get(0);
-    Integer price = (Integer) prod.get("price");
+    Number priceNumber = (Number) prod.get("price");  // تحويل آمن
+    Integer price = priceNumber.intValue();
 
     // إنشاء عنصر الطلب
     Map<String, Object> item = new HashMap<>();
@@ -145,7 +146,7 @@ public void addOrderItem(Integer orderId, Integer productId, Integer quantity) {
             .header("Prefer", "return=representation")
             .bodyValue(item)
             .retrieve()
-            .bodyToMono(List.class)  // ✅ نفس الشيء: قائمة
+            .bodyToMono(List.class)
             .block();
 
     // تحديث إجمالي الطلب
@@ -158,7 +159,11 @@ public void addOrderItem(Integer orderId, Integer productId, Integer quantity) {
             .block();
 
     Integer totalPrice = totalItems.stream()
-            .mapToInt(i -> ((Number)i.get("quantity")).intValue() * ((Number)i.get("unit_price")).intValue())
+            .mapToInt(i -> {
+                Number q = (Number) i.get("quantity");
+                Number u = (Number) i.get("unit_price");
+                return q.intValue() * u.intValue();
+            })
             .sum();
 
     Map<String, Object> totalUpdate = new HashMap<>();
@@ -174,6 +179,7 @@ public void addOrderItem(Integer orderId, Integer productId, Integer quantity) {
             .bodyToMono(Void.class)
             .block();
 }
+
 
 
     // تحديث رقم الهاتف للعميل
@@ -208,4 +214,5 @@ public void addOrderItem(Integer orderId, Integer productId, Integer quantity) {
                 .block();
     }
 }
+
 
