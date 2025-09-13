@@ -189,13 +189,30 @@ public class TelegramService extends TelegramWebhookBot {
 
     }
 
-    private void handleContact(Long chatId, Contact contact) throws TelegramApiException {
+   private void handleContact(Long chatId, Contact contact) throws TelegramApiException {
         Integer orderId = pendingOrders.get(chatId);
         Map<String, Object> client = clientsDataCache.get(chatId);
         if (orderId == null || client == null) return;
 
-        // تحديث الرقم وتأكيد الطلب
-        supabaseService.updateClientPhone((Integer) client.get("id"), contact.getPhoneNumber());
+        // تحديث الرقم باستخدام الدالة الجديدة
+        Integer finalClientId = supabaseService.updateClientPhone(
+                (Integer) client.get("id"),
+                contact.getPhoneNumber(),
+                (String) client.get("owner_name")
+        );
+
+        if (finalClientId == null) {
+            execute(SendMessage.builder()
+                    .chatId(chatId.toString())
+                    .text("⚠️ حدث خطأ أثناء تحديث رقم الهاتف، يرجى المحاولة لاحقاً.")
+                    .build());
+            return;
+        }
+
+        // تحديث الكاش بالـ clientId النهائي
+        clientsCache.put(chatId, finalClientId);
+
+        // تأكيد الطلب
         supabaseService.confirmOrderAndGet(orderId);
 
         // بطاقة ترحيب
@@ -239,7 +256,7 @@ public class TelegramService extends TelegramWebhookBot {
         // تنظيف الطلبات المعلقة
         pendingOrders.remove(chatId);
     }
-
 }
+
 
 
