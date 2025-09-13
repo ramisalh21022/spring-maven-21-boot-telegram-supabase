@@ -25,7 +25,7 @@ public class TelegramService extends TelegramWebhookBot {
     private final Map<Long, Integer> clientsCache = new HashMap<>();
     private final Map<Long, Map<String, Object>> clientsDataCache = new HashMap<>();
     private final Map<Long, Integer> pendingOrders = new HashMap<>();
-    private final Long distributorChatId = 963933210196L;
+    private final Long distributorChatId = 963940452940L;
 
     @Override
     public String getBotUsername() {
@@ -180,3 +180,4 @@ public class TelegramService extends TelegramWebhookBot {
         pendingOrders.remove(chatId);
     }
 }
+
