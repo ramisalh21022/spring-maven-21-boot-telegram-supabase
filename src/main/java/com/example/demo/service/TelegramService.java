@@ -74,7 +74,10 @@ public class TelegramService extends TelegramWebhookBot {
         if (client == null) {
             client = supabaseService.createOrGetClient(msg.getFrom(), chatId);
             clientsDataCache.put(chatId, client);
-            clientsCache.put(chatId, (Integer) client.get("id"));
+            // التحويل الآمن للـ Integer
+            Number idNumber = (Number) client.get("id");
+            Integer clientId = idNumber.intValue();
+            clientsCache.put(chatId, clientId);
         }
 
         execute(SendMessage.builder().chatId(chatId.toString())
@@ -93,7 +96,7 @@ public class TelegramService extends TelegramWebhookBot {
 
             InlineKeyboardButton orderBtn = InlineKeyboardButton.builder()
                     .text("اطلب الآن")
-                    .callbackData("order_" + product.get("id"))
+                    .callbackData("order_" + ((Number) product.get("id")).intValue()) // آمن
                     .build();
             List<InlineKeyboardButton> row = Collections.singletonList(orderBtn);
             List<List<InlineKeyboardButton>> keyboard = Collections.singletonList(row);
@@ -123,7 +126,11 @@ public class TelegramService extends TelegramWebhookBot {
 
         if (data.startsWith("order_")) {
             Integer productId = Integer.parseInt(data.split("_")[1]);
-            Integer clientId = clientsCache.get(chatId);
+            Integer clientId = null;
+            Number idNumber = clientsCache.get(chatId);
+            if (idNumber != null) {
+                clientId = idNumber.intValue();
+            }
             if (clientId == null) {
                 execute(SendMessage.builder().chatId(chatId.toString())
                         .text("⚠️ حدث خطأ: العميل غير موجود").build());
