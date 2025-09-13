@@ -25,7 +25,7 @@ public class TelegramService extends TelegramWebhookBot {
     private final Map<Long, Integer> clientsCache = new HashMap<>();
     private final Map<Long, Map<String, Object>> clientsDataCache = new HashMap<>();
     private final Map<Long, Integer> pendingOrders = new HashMap<>();
-    private final Long distributorChatId = 963940452940L;
+    private final Long distributorChatId = 963933210196L;
 
     @Override
     public String getBotUsername() {
@@ -157,6 +157,36 @@ public class TelegramService extends TelegramWebhookBot {
 
             execute(new org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery(callbackQuery.getId()));
         }
+        if (data.startsWith("SEND_TG")) {
+            execute(SendMessage.builder().chatId(chatId.toString())
+                    .text("📢 تم إرسال طلبك للمتجر عبر Telegram ✅").build());
+
+            execute(SendMessage.builder().chatId(distributorChatId.toString())
+                    .text("📦 طلب جديد من Telegram\n🆔 رقم الطلب: " + data.split(":")[1])
+                    .build());
+        }
+
+        else if (data.startsWith("SEND_WA")) {
+            execute(SendMessage.builder().chatId(chatId.toString())
+                    .text("💬 تم تجهيز رابط لإرسال الطلب عبر WhatsApp ✅").build());
+
+            // رابط جاهز لواتساب
+            String waLink = "https://wa.me/" + distributorChatId +
+                    "?text=طلب%20جديد%20رقم%20" + data.split(":")[1];
+            execute(SendMessage.builder().chatId(chatId.toString())
+                    .text("اضغط هنا لإرسال الطلب عبر WhatsApp:\n" + waLink).build());
+        }
+
+        else if (data.startsWith("SEND_SMS")) {
+            execute(SendMessage.builder().chatId(chatId.toString())
+                    .text("📩 تم تجهيز رسالة SMS لإرسال الطلب ✅").build());
+
+            String smsLink = "sms:" + distributorChatId + "?body=طلب جديد رقم " + data.split(":")[1];
+            execute(SendMessage.builder().chatId(chatId.toString())
+                    .text("اضغط هنا لإرسال SMS:\n" + smsLink).build());
+        }
+
+
     }
 
     private void handleContact(Long chatId, Contact contact) throws TelegramApiException {
@@ -164,20 +194,50 @@ public class TelegramService extends TelegramWebhookBot {
         Map<String, Object> client = clientsDataCache.get(chatId);
         if (orderId == null || client == null) return;
 
+        // تحديث الرقم وتأكيد الطلب
         supabaseService.updateClientPhone((Integer) client.get("id"), contact.getPhoneNumber());
         supabaseService.confirmOrder(orderId);
 
-        execute(SendMessage.builder().chatId(chatId.toString())
-                .text(String.format("✅ تم تأكيد طلبك بنجاح.\n🎉 رقم الطلب: %d\n👤 %s\n📱 هاتفك: %s\n🚚 سيتم التواصل معك قريبًا.",
-                        orderId, client.get("owner_name"), contact.getPhoneNumber()))
+        // بطاقة ترحيب
+        String distributorPhone = "+963933210196"; // رقم المتجر الثابت
+        String message = "🎉 شكراً لتأكيد طلبك!\n\n" +
+                "🆔 رقم الطلب: " + orderId + "\n" +
+                "👤 الاسم: " + client.get("owner_name") + "\n" +
+                "📱 هاتفك: " + contact.getPhoneNumber() + "\n" +
+                "☎️ هاتف المتجر: " + distributorPhone + "\n\n" +
+                "✅ اختر طريقة إرسال طلبك للمتجر:";
+
+        InlineKeyboardButton tgButton = InlineKeyboardButton.builder()
+                .text("📢 عبر Telegram")
+                .callbackData("SEND_TG:" + orderId)
+                .build();
+
+        InlineKeyboardButton waButton = InlineKeyboardButton.builder()
+                .text("💬 عبر WhatsApp")
+                .callbackData("SEND_WA:" + orderId)
+                .build();
+
+        InlineKeyboardButton smsButton = InlineKeyboardButton.builder()
+                .text("📩 عبر SMS")
+                .callbackData("SEND_SMS:" + orderId)
+                .build();
+
+        InlineKeyboardMarkup markup = InlineKeyboardMarkup.builder()
+                .keyboard(List.of(
+                        List.of(tgButton),
+                        List.of(waButton),
+                        List.of(smsButton)
+                ))
+                .build();
+
+        execute(SendMessage.builder()
+                .chatId(chatId.toString())
+                .text(message)
+                .replyMarkup(markup)
                 .build());
 
-        execute(SendMessage.builder().chatId(distributorChatId.toString())
-                .text(String.format("📦 طلب جديد مؤكد!\n🎉 رقم الطلب: %d\n👤 العميل: %s\n📱 الهاتف: %s",
-                        orderId, client.get("owner_name"), contact.getPhoneNumber()))
-                .build());
-
+        // تنظيف الطلبات المعلقة
         pendingOrders.remove(chatId);
     }
-}
 
+}
