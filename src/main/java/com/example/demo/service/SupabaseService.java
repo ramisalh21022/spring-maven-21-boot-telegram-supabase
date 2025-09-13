@@ -112,66 +112,69 @@ public class SupabaseService {
     }
 
     // إضافة عنصر للطلب
-    public void addOrderItem(Integer orderId, Integer productId, Integer quantity) {
-        List<Map<String, Object>> prod = webClient.get()
-                .uri(appConfig.getSupabaseUrl() + "/rest/v1/products_comp?id=eq." + productId)
-                .header("apikey", appConfig.getSupabaseKey())
-                .header("Authorization", "Bearer " + appConfig.getSupabaseKey())
-                .retrieve()
-                .bodyToMono(List.class)
-                .block();
+public void addOrderItem(Integer orderId, Integer productId, Integer quantity) {
+    // جلب المنتج أولاً
+    List<Map<String, Object>> prodList = webClient.get()
+            .uri(appConfig.getSupabaseUrl() + "/rest/v1/products_comp?id=eq." + productId)
+            .header("apikey", appConfig.getSupabaseKey())
+            .header("Authorization", "Bearer " + appConfig.getSupabaseKey())
+            .retrieve()
+            .bodyToMono(List.class)  // ✅ استبدل Map.class بـ List.class
+            .block();
 
-        Number priceNum = (Number) ((Map<String,Object>)prod.get(0)).get("price");
-        Integer price = priceNum.intValue();
-
-        Map<String, Object> item = new HashMap<>();
-        item.put("order_id", orderId);
-        item.put("product_id", productId);
-        item.put("quantity", quantity);
-        item.put("unit_price", price);
-
-        webClient.post()
-                .uri(appConfig.getSupabaseUrl() + "/rest/v1/order_items")
-                .header("apikey", appConfig.getSupabaseKey())
-                .header("Authorization", "Bearer " + appConfig.getSupabaseKey())
-                .header("Content-Type", "application/json")
-                .header("Prefer", "return=representation")
-                .bodyValue(item)
-                .retrieve()
-                .bodyToMono(Map.class)
-                .block();
-
-        // تحديث إجمالي الطلب
-        List<Map<String,Object>> totalItems = webClient.get()
-                .uri(appConfig.getSupabaseUrl() + "/rest/v1/order_items?order_id=eq." + orderId)
-                .header("apikey", appConfig.getSupabaseKey())
-                .header("Authorization", "Bearer " + appConfig.getSupabaseKey())
-                .retrieve()
-                .bodyToMono(List.class)
-                .block();
-
-        Integer totalPrice = totalItems.stream()
-                .mapToInt(i -> {
-                    Number q = (Number)i.get("quantity");
-                    Number u = (Number)i.get("unit_price");
-                    return q.intValue() * u.intValue();
-                })
-                .sum();
-
-
-        Map<String, Object> totalUpdate = new HashMap<>();
-        totalUpdate.put("total_price", totalPrice);
-
-        webClient.patch()
-                .uri(appConfig.getSupabaseUrl() + "/rest/v1/orders?id=eq." + orderId)
-                .header("apikey", appConfig.getSupabaseKey())
-                .header("Authorization", "Bearer " + appConfig.getSupabaseKey())
-                .header("Content-Type", "application/json")
-                .bodyValue(totalUpdate)
-                .retrieve()
-                .bodyToMono(Void.class)
-                .block();
+    if (prodList == null || prodList.isEmpty()) {
+        throw new RuntimeException("المنتج غير موجود");
     }
+
+    Map<String, Object> prod = prodList.get(0);
+    Integer price = (Integer) prod.get("price");
+
+    // إنشاء عنصر الطلب
+    Map<String, Object> item = new HashMap<>();
+    item.put("order_id", orderId);
+    item.put("product_id", productId);
+    item.put("quantity", quantity);
+    item.put("unit_price", price);
+
+    // إرسال الطلب إلى Supabase
+    List<Map<String,Object>> response = webClient.post()
+            .uri(appConfig.getSupabaseUrl() + "/rest/v1/order_items")
+            .header("apikey", appConfig.getSupabaseKey())
+            .header("Authorization", "Bearer " + appConfig.getSupabaseKey())
+            .header("Content-Type", "application/json")
+            .header("Prefer", "return=representation")
+            .bodyValue(item)
+            .retrieve()
+            .bodyToMono(List.class)  // ✅ نفس الشيء: قائمة
+            .block();
+
+    // تحديث إجمالي الطلب
+    List<Map<String,Object>> totalItems = webClient.get()
+            .uri(appConfig.getSupabaseUrl() + "/rest/v1/order_items?order_id=eq." + orderId)
+            .header("apikey", appConfig.getSupabaseKey())
+            .header("Authorization", "Bearer " + appConfig.getSupabaseKey())
+            .retrieve()
+            .bodyToMono(List.class)
+            .block();
+
+    Integer totalPrice = totalItems.stream()
+            .mapToInt(i -> ((Number)i.get("quantity")).intValue() * ((Number)i.get("unit_price")).intValue())
+            .sum();
+
+    Map<String, Object> totalUpdate = new HashMap<>();
+    totalUpdate.put("total_price", totalPrice);
+
+    webClient.patch()
+            .uri(appConfig.getSupabaseUrl() + "/rest/v1/orders?id=eq." + orderId)
+            .header("apikey", appConfig.getSupabaseKey())
+            .header("Authorization", "Bearer " + appConfig.getSupabaseKey())
+            .header("Content-Type", "application/json")
+            .bodyValue(totalUpdate)
+            .retrieve()
+            .bodyToMono(Void.class)
+            .block();
+}
+
 
     // تحديث رقم الهاتف للعميل
     public void updateClientPhone(Integer clientId, String phone) {
@@ -205,3 +208,4 @@ public class SupabaseService {
                 .block();
     }
 }
+
