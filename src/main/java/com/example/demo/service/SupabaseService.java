@@ -121,7 +121,8 @@ public class SupabaseService {
                 .bodyToMono(List.class)
                 .block();
 
-        Integer price = (Integer) ((Map<String,Object>)prod.get(0)).get("price");
+        Number priceNum = (Number) ((Map<String,Object>)prod.get(0)).get("price");
+        Integer price = priceNum.intValue();
 
         Map<String, Object> item = new HashMap<>();
         item.put("order_id", orderId);
@@ -150,8 +151,13 @@ public class SupabaseService {
                 .block();
 
         Integer totalPrice = totalItems.stream()
-                .mapToInt(i -> (Integer)i.get("quantity") * (Integer)i.get("unit_price"))
+                .mapToInt(i -> {
+                    Number q = (Number)i.get("quantity");
+                    Number u = (Number)i.get("unit_price");
+                    return q.intValue() * u.intValue();
+                })
                 .sum();
+
 
         Map<String, Object> totalUpdate = new HashMap<>();
         totalUpdate.put("total_price", totalPrice);
