@@ -25,7 +25,7 @@ public class TelegramService extends TelegramWebhookBot {
     private final Map<Long, Integer> clientsCache = new HashMap<>();
     private final Map<Long, Map<String, Object>> clientsDataCache = new HashMap<>();
     private final Map<Long, Integer> pendingOrders = new HashMap<>();
-    private final Long distributorChatId = 963933210196L;
+    private final Long distributorChatId = 963940452940L;
 
     @Override
     public String getBotUsername() {
@@ -199,7 +199,7 @@ public class TelegramService extends TelegramWebhookBot {
         supabaseService.confirmOrder(orderId);
 
         // بطاقة ترحيب
-        String distributorPhone = "+963933210196"; // رقم المتجر الثابت
+        String distributorPhone = "963940452940"; // رقم المتجر الثابت
         String message = "🎉 شكراً لتأكيد طلبك!\n\n" +
                 "🆔 رقم الطلب: " + orderId + "\n" +
                 "👤 الاسم: " + client.get("owner_name") + "\n" +
@@ -241,3 +241,4 @@ public class TelegramService extends TelegramWebhookBot {
     }
 
 }
+
