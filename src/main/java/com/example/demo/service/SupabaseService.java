@@ -202,49 +202,46 @@ public boolean addOrderItem(Integer orderId, Integer productId, Integer quantity
 
 
     // تحديث رقم الهاتف للعميل
-public Integer updateClientPhone(Integer tempClientId, String realPhone, String ownerName) {
-        // 1. تحقق إذا الرقم موجود مسبقًا
-        List<Map<String, Object>> existing = webClient.get()
-                .uri(appConfig.getSupabaseUrl() + "/rest/v1/clients?phone=eq." + realPhone)
-                .header("apikey", appConfig.getSupabaseKey())
-                .header("Authorization", "Bearer " + appConfig.getSupabaseKey())
-                .retrieve()
-                .bodyToMono(new ParameterizedTypeReference<List<Map<String, Object>>>() {})
-                .block();
+public Integer updateClientPhone(Integer clientId, String phone) {
+    try {
+        // محاولة تحديث العميل الحالي
+        Map<String,Object> body = new HashMap<>();
+        body.put("phone", phone);
 
-        if (existing != null && !existing.isEmpty()) {
-            // الرقم موجود → استخدم العميل الموجود
-            Map<String, Object> client = existing.get(0);
-
-            // احذف السجل المؤقت إذا موجود
-            webClient.delete()
-                    .uri(appConfig.getSupabaseUrl() + "/rest/v1/clients?id=eq." + tempClientId)
-                    .header("apikey", appConfig.getSupabaseKey())
-                    .header("Authorization", "Bearer " + appConfig.getSupabaseKey())
-                    .retrieve()
-                    .toBodilessEntity()
-                    .block();
-
-            return (Integer) client.get("id");
-        }
-
-        // 2. الرقم غير موجود → عدّل العميل المؤقت
-        Map<String, Object> body = new HashMap<>();
-        body.put("phone", realPhone);
-        body.put("owner_name", ownerName); // لو تحب تحديث الاسم أيضًا
-
-        List<Map<String, Object>> updated = webClient.patch()
-                .uri(appConfig.getSupabaseUrl() + "/rest/v1/clients?id=eq." + tempClientId)
+        webClient.patch()
+                .uri(appConfig.getSupabaseUrl() + "/rest/v1/clients?id=eq." + clientId)
                 .header("apikey", appConfig.getSupabaseKey())
                 .header("Authorization", "Bearer " + appConfig.getSupabaseKey())
                 .header("Content-Type", "application/json")
                 .bodyValue(body)
                 .retrieve()
-                .bodyToMono(new ParameterizedTypeReference<List<Map<String, Object>>>() {})
+                .bodyToMono(Void.class)
                 .block();
 
-        return updated != null && !updated.isEmpty() ? (Integer) updated.get(0).get("id") : null;
+        return clientId; // تم التحديث بنجاح
+
+    } catch (WebClientResponseException.Conflict e) {
+        // حصل تعارض بسبب رقم الهاتف موجود مسبقًا
+        // البحث عن العميل حسب الرقم وإرجاع الـ clientId الموجود
+        List<Map<String, Object>> existingClients = webClient.get()
+                .uri(appConfig.getSupabaseUrl() + "/rest/v1/clients?phone=eq." + phone)
+                .header("apikey", appConfig.getSupabaseKey())
+                .header("Authorization", "Bearer " + appConfig.getSupabaseKey())
+                .retrieve()
+                .bodyToMono(new ParameterizedTypeReference<List<Map<String,Object>>>() {})
+                .block();
+
+        if (existingClients != null && !existingClients.isEmpty()) {
+            return ((Number) existingClients.get(0).get("id")).intValue();
+        } else {
+            // لو الرقم غير موجود، نعيد clientId القديم
+            return clientId;
+        }
+    } catch (Exception e) {
+        e.printStackTrace();
+        return null; // فشل التحديث
     }
+}
 
     // تأكيد الطلب
    // تأكيد الطلب وإرجاع معلوماته
@@ -274,6 +271,7 @@ public Map<String, Object> confirmOrderAndGet(Integer orderId) {
 
 
 }
+
 
 
 
