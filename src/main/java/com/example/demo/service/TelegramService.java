@@ -196,7 +196,7 @@ public class TelegramService extends TelegramWebhookBot {
 
         // تحديث الرقم وتأكيد الطلب
         supabaseService.updateClientPhone((Integer) client.get("id"), contact.getPhoneNumber());
-        supabaseService.confirmOrder(orderId);
+        supabaseService.confirmOrderAndGet(orderId);
 
         // بطاقة ترحيب
         String distributorPhone = "963940452940"; // رقم المتجر الثابت
@@ -241,4 +241,5 @@ public class TelegramService extends TelegramWebhookBot {
     }
 
 }
+
 
